@@ -1,0 +1,128 @@
+# CampusOverflow 统一配置。默认 dev（本地 Docker Compose 起 MySQL/Redis），生产用 prod profile。
+spring:
+  application:
+    name: campus-overflow
+  profiles:
+    default: dev
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:campus_overflow}?useUnicode=true&characterEncoding=utf8mb4&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&rewriteBatchedStatements=true
+    username: ${DB_USER:campus}
+    password: ${DB_PASSWORD:campus_dev_pwd}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      pool-name: co-pool
+  jpa:
+    open-in-view: false            # 关闭 OSIV：事务边界只在应用服务中（FF-4）
+    hibernate:
+      ddl-auto: none               # 表结构只由 Flyway 管理
+    properties:
+      hibernate.jdbc.time_zone: UTC
+      hibernate.jdbc.batch_size: 30
+      hibernate.order_inserts: true
+  flyway:
+    enabled: true
+    # 每个上下文拥有独立的迁移目录，互不干扰（平台表放在 platform）
+    locations: classpath:db/migration/platform,classpath:db/migration/identity,classpath:db/migration/qa,classpath:db/migration/reputation,classpath:db/migration/discovery
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+  session:
+    timeout: 30m
+    redis:
+      namespace: co:session
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  threads:
+    virtual:
+      # 虚拟线程（Java 21）：可作为性能实验开关打开，注意 MySQL 驱动的 synchronized 可能造成载体线程 pinning
+      enabled: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework    # 部署在 Nginx 之后
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        same-site: lax
+        secure: ${COOKIE_SECURE:false}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: campus-overflow
+
+logging:
+  level:
+    com.campusoverflow: INFO
+
+co:
+  security:
+    # 邮箱等敏感字段的加密密钥（AES-256-GCM，Base64 的 32 字节）。生产环境必须用环境变量注入！
+    field-key: ${CO_FIELD_KEY:GB7LwwDgcWpslCMsYtIkTbDrzER+IbjJwhtSu7LPz1I=}
+    login:
+      max-failures: 5
+      window-seconds: 60
+  outbox:
+    poll-interval-ms: 500
+    batch-size: 100
+    max-attempts: 10
+    cleanup-cron: "0 0 4 * * *"
+  qa:
+    view-flush-interval-ms: 60000
+  reputation:
+    bounty-expiry-interval-ms: 300000
+    reconcile-cron: "0 30 3 * * *"
+  discovery:
+    search:
+      engine: fulltext            # fulltext（MySQL ngram，默认）| like（退化实现，用于对照）
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+logging:
+  level:
+    com.campusoverflow: DEBUG
+    org.springframework.jdbc.core.JdbcTemplate: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    properties:
+      hibernate.generate_statistics: false
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
+springdoc:
+  swagger-ui:
+    enabled: false                 # 生产环境关闭在线文档
+co:
+  security:
+    field-key: ${CO_FIELD_KEY}     # 未注入则启动失败（快速失败优于带着默认密钥上线）

@@ -1,0 +1,93 @@
+# 一键启动完整环境：docker compose -f deploy/docker-compose.yml --profile observability up -d --build
+# 仅启动应用（不含监控）：docker compose -f deploy/docker-compose.yml up -d --build
+name: campus-overflow
+
+services:
+  mysql:
+    image: mysql:8.0.39
+    container_name: co-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --ngram-token-size=2               # 中文全文检索（ADR-005）
+      - --innodb-ft-enable-stopword=0      # 避免 ngram 词元因包含停用词被丢弃
+      - --default-time-zone=+00:00         # 全库统一 UTC
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_dev_pwd}
+      MYSQL_DATABASE: campus_overflow
+      MYSQL_USER: campus
+      MYSQL_PASSWORD: ${DB_PASSWORD:-campus_dev_pwd}
+    ports: ["3306:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-root_dev_pwd}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: co-redis
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports: ["6379:6379"]
+    volumes: ["redis-data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    container_name: co-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES:-prod,demo}   # demo 会写入演示数据，正式使用时去掉
+      DB_HOST: mysql
+      DB_USER: campus
+      DB_PASSWORD: ${DB_PASSWORD:-campus_dev_pwd}
+      REDIS_HOST: redis
+      CO_FIELD_KEY: ${CO_FIELD_KEY:-GB7LwwDgcWpslCMsYtIkTbDrzER+IbjJwhtSu7LPz1I=}
+      COOKIE_SECURE: "false"                                   # 通过 HTTPS 发布时改为 true
+      TZ: UTC
+    depends_on:
+      mysql: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+    container_name: co-web
+    depends_on:
+      backend: { condition: service_started }
+    ports: ["80:80"]
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: co-prometheus
+    profiles: ["observability"]
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: co-grafana
+    profiles: ["observability"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    depends_on: [prometheus]
+    ports: ["3000:3000"]
+    volumes: ["grafana-data:/var/lib/grafana"]
+
+volumes:
+  mysql-data:
+  redis-data:
+  grafana-data:

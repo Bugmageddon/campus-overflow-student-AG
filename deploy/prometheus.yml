@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: campus-overflow
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["backend:8080"]
+# 建议在 Grafana 中关注的自定义指标：
+#   co_outbox_backlog        发件箱积压（>100 持续 5 分钟应告警）
+#   co_outbox_dead_letters   死信事件数（>0 即需人工介入）
+#   co_reputation_mismatches 声誉对账不一致账户数（FF-8，应恒为 0）
+#   http_server_requests_seconds{uri="/api/v1/questions/{questionId}"}  详情页 P95（QS-01 ≤ 300ms）

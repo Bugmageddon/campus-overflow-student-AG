@@ -29,7 +29,7 @@ jobs:
         run: mvn -B -f backend/pom.xml test -pl co-shared-kernel,co-identity/co-identity-api,co-identity/co-identity-domain,co-identity/co-identity-application,co-identity/co-identity-infrastructure,co-identity/co-identity-interfaces -am
 
       - name: 架构约束
-        run: mvn -B -f backend/pom.xml test -pl co-bootstrap -am -Dtest=ArchitectureTest -DfailIfNoTests=false
+        run: mvn -B -f backend/pom.xml test -pl co-bootstrap -am -Dtest=ArchitectureTest -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
 
       - name: 归档测试报告
         if: always()

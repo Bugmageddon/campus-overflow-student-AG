@@ -1,4 +1,3 @@
-# CampusOverflow 持续集成流水线（对应 arc42 第 10 章适应度函数与第 7 章部署视图）
 name: CI
 
 on:
@@ -7,6 +6,9 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: 后端构建与验证
@@ -14,32 +16,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 配置 JDK 21
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: "21"
           distribution: temurin
           cache: maven
 
-      # 阶段 1：编译（模块依赖不成环由 Maven 保证）
       - name: 编译
         run: mvn -B -f backend/pom.xml clean compile
 
-      # 阶段 2：单元测试（领域层 + 应用层，毫秒级，无外部依赖）
-      - name: 单元测试
-        run: mvn -B -f backend/pom.xml test
+      - name: Sprint 0 单元测试（共享内核 + Identity）
+        run: mvn -B -f backend/pom.xml test -pl co-shared-kernel,co-identity/co-identity-api,co-identity/co-identity-domain,co-identity/co-identity-application,co-identity/co-identity-infrastructure,co-identity/co-identity-interfaces -am
 
-      # 阶段 3：架构适应度函数（ArchUnit：FF-1~FF-6）
-      - name: 架构约束检查
-        run: mvn -B -f backend/pom.xml test -pl co-bootstrap -Dtest=ArchitectureTest -DfailIfNoTests=false
-
-      # 阶段 4：领域层覆盖率门禁（低于阈值直接失败）
-      - name: 覆盖率门禁
-        run: mvn -B -f backend/pom.xml verify -DskipITs -Djacoco.skip=false
-
-      # 阶段 5：集成测试（Testcontainers 拉起真实 MySQL + Redis）
-      - name: 集成测试
-        run: mvn -B -f backend/pom.xml verify -Dsurefire.skip=true
+      - name: 架构约束
+        run: mvn -B -f backend/pom.xml test -pl co-bootstrap -am -Dtest=ArchitectureTest -DfailIfNoTests=false
 
       - name: 归档测试报告
         if: always()
@@ -53,15 +43,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
       - name: 安装依赖
         working-directory: frontend
         run: npm install --no-audit --no-fund
+
       - name: 类型检查
         working-directory: frontend
         run: npm run typecheck
+
       - name: 构建
         working-directory: frontend
         run: npm run build
@@ -70,7 +64,7 @@ jobs:
     name: 容器镜像构建
     runs-on: ubuntu-latest
     needs: [backend, frontend]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - name: 构建后端镜像

@@ -6,12 +6,10 @@ import com.campusoverflow.shared.domain.Guard;
 public record MarkdownBody(String value) {
 
     public static MarkdownBody ofQuestion(String raw) {
-        // TODO(S2)：实现 MarkdownBody.ofQuestion——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S2)：MarkdownBody.ofQuestion 尚未实现");
+        return new MarkdownBody(Guard.requireText(raw, 20, 30000, "QA-1002", "问题正文"));
     }
 
     public static MarkdownBody ofAnswer(String raw) {
-        // TODO(S2)：实现 MarkdownBody.ofAnswer——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S2)：MarkdownBody.ofAnswer 尚未实现");
+        return new MarkdownBody(Guard.requireText(raw, 10, 30000, "QA-1002", "回答正文"));
     }
 }

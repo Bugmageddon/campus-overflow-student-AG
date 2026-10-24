@@ -19,7 +19,8 @@ public class QaQueryApiImpl implements QaQueryApi {
 
     @Override
     public Optional<QuestionRef> findQuestion(long questionId) {
-        // TODO(S2)：实现 QaQueryApiImpl.findQuestion——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S2)：QaQueryApiImpl.findQuestion 尚未实现");
+        return questions.findById(questionId)
+                .map(question -> new QuestionRef(question.id(), question.authorId(), question.courseId(),
+                        question.title().value(), question.acceptedAnswerId(), question.isDeleted()));
     }
 }

@@ -3,6 +3,7 @@ package com.campusoverflow.reputation.application;
 import com.campusoverflow.identity.api.IdentityApi;
 import com.campusoverflow.identity.api.UserSummary;
 import com.campusoverflow.reputation.api.event.ReputationChangedEvent;
+import com.campusoverflow.reputation.domain.ReputationAccount;
 import com.campusoverflow.reputation.domain.ReputationAccountRepository;
 import com.campusoverflow.shared.event.ProcessedEventStore;
 import java.time.Clock;

@@ -75,10 +75,10 @@ public class NotificationProjector {
         for (String mention : MentionParser.extract(e.body())) {
             Optional<UserSummary> user = identity.findByDisplayName(mention);
             // 查无此人或与评论作者相同，跳过
-            if (user.isEmpty() || user.get().userId() == e.authorId()) {
+            if (user.isEmpty() || user.get().id() == e.authorId()) {
                 continue;
             }
-            notify(user.get().userId(), NotificationType.MENTIONED,
+            notify(user.get().id(), NotificationType.MENTIONED,
                     name(e.authorId()) + " 在评论中提到了你", "/questions/" + e.questionId(), e.eventId(),
                     e.occurredAt());
         }

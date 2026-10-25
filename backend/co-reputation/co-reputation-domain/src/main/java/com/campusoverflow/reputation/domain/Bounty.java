@@ -46,8 +46,20 @@ public class Bounty {
      */
     public static Bounty open(long questionId, boolean questionOpen, Actor sponsor, boolean sponsorManagesCourse,
                               int points, int days, Instant now) {
-        // TODO(S3)：实现 Bounty.open——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Bounty.open 尚未实现");
+        if (!sponsorManagesCourse) {
+            throw new ForbiddenException("REP-3001", "仅课程管理者可以发起悬赏");
+        }
+        if (points < MIN_POINTS || points > MAX_POINTS) {
+            throw new BusinessRuleException("REP-1003", "悬赏积分应在 " + MIN_POINTS + "–" + MAX_POINTS + " 之间");
+        }
+        if (days < 1 || days > MAX_DAYS) {
+            throw new BusinessRuleException("REP-1004", "悬赏期限应在 1–" + MAX_DAYS + " 天之间");
+        }
+        if (!questionOpen) {
+            throw new BusinessRuleException("REP-1001", "问题已删除或已采纳，不能发起悬赏");
+        }
+        return new Bounty(null, questionId, sponsor.userId(), points, BountyStatus.OPEN, now,
+                now.plus(Duration.ofDays(days)), null, null, null);
     }
 
     public static Bounty reconstitute(Long id, long questionId, long sponsorId, int points, BountyStatus status,
@@ -58,24 +70,31 @@ public class Bounty {
     }
 
     public void award(long answerId, long winnerId, Instant now) {
-        // TODO(S3)：实现 Bounty.award——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Bounty.award 尚未实现");
+        ensureOpen();
+        if (winnerId == sponsorId) {
+            throw new BusinessRuleException("REP-1005", "发起人不能赢得自己的悬赏");
+        }
+        this.status = BountyStatus.AWARDED;
+        this.winnerId = winnerId;
+        this.answerId = answerId;
+        this.closedAt = now;
     }
 
     /** 关闭并退款：到期未采纳，或被采纳的恰好是发起人自己的回答。 */
     public void close(Instant now) {
-        // TODO(S3)：实现 Bounty.close——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Bounty.close 尚未实现");
+        ensureOpen();
+        this.status = BountyStatus.EXPIRED;
+        this.closedAt = now;
     }
 
     public boolean isDue(Instant now) {
-        // TODO(S3)：实现 Bounty.isDue——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Bounty.isDue 尚未实现");
+        return status == BountyStatus.OPEN && !now.isBefore(expiresAt);
     }
 
     private void ensureOpen() {
-        // TODO(S3)：实现 Bounty.ensureOpen——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Bounty.ensureOpen 尚未实现");
+        if (status != BountyStatus.OPEN) {
+            throw new ConflictException("REP-2002", "悬赏已结束");
+        }
     }
 
     public void assignId(long id) {

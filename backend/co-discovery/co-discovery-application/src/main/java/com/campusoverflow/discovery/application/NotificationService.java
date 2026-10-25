@@ -6,6 +6,7 @@ import com.campusoverflow.shared.domain.NotFoundException;
 import com.campusoverflow.shared.page.PageRequest;
 import com.campusoverflow.shared.page.PageResult;
 import com.campusoverflow.shared.security.Actor;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,30 +22,30 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public PageResult<NotificationView> list(Actor actor, PageRequest page) {
-        // TODO(S3)：实现 NotificationService.list——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：NotificationService.list 尚未实现");
+        PageResult<Notification> result = notifications.findByRecipient(actor.userId(), page);
+        List<NotificationView> items = result.items().stream().map(NotificationService::toView).toList();
+        return new PageResult<>(items, result.total(), result.page(), result.size());
     }
 
     @Transactional(readOnly = true)
     public long unreadCount(Actor actor) {
-        // TODO(S3)：实现 NotificationService.unreadCount——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：NotificationService.unreadCount 尚未实现");
+        return notifications.countUnread(actor.userId());
     }
 
     @Transactional
     public void markRead(Actor actor, long notificationId) {
-        // TODO(S3)：实现 NotificationService.markRead——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：NotificationService.markRead 尚未实现");
+        Notification notification = notifications.findById(notificationId)
+                .orElseThrow(() -> new NotFoundException("DIS-4001", "通知不存在"));
+        notification.markRead(actor.userId());
+        notifications.save(notification);
     }
 
     @Transactional
     public int markAllRead(Actor actor) {
-        // TODO(S3)：实现 NotificationService.markAllRead——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：NotificationService.markAllRead 尚未实现");
+        return notifications.markAllRead(actor.userId());
     }
 
     private static NotificationView toView(Notification n) {
-        // TODO(S3)：实现 NotificationService.toView——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：NotificationService.toView 尚未实现");
+        return new NotificationView(n.id(), n.type().name(), n.title(), n.link(), n.read(), n.createdAt());
     }
 }

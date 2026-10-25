@@ -29,12 +29,31 @@ public class DiscoveryQueryService {
     }
 
     public PageResult<SearchResultView> search(SearchQuery query) {
-        // TODO(S3)：实现 DiscoveryQueryService.search——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：DiscoveryQueryService.search 尚未实现");
+        PageResult<SearchHit> result = search.search(query);
+        Map<Long, UserSummary> authors = identity.findUsers(
+                result.items().stream().map(SearchHit::authorId).distinct().toList());
+        List<SearchResultView> items = result.items().stream().map(hit -> {
+            UserSummary author = authors.get(hit.authorId());
+            return new SearchResultView(hit.questionId(), hit.title(), hit.snippet(), hit.tags(), hit.courseId(),
+                    author == null
+                            ? new SearchResultView.Author(hit.authorId(), "某同学", "STUDENT", false)
+                            : new SearchResultView.Author(author.id(), author.displayName(), author.role().name(),
+                                    author.verified()),
+                    hit.score(), hit.answerCount(), hit.accepted(), hit.bountyOpen(), hit.createdAt());
+        }).toList();
+        return new PageResult<>(items, result.total(), result.page(), result.size());
     }
 
     public List<RelatedQuestionView> related(long questionId, int limit) {
-        // TODO(S3)：实现 DiscoveryQueryService.related——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：DiscoveryQueryService.related 尚未实现");
+        List<String> tags = index.findTags(questionId);
+        if (tags.isEmpty()) {
+            return List.of();
+        }
+        return RelatedQuestionPolicy
+                .rank(index.findCandidatesSharingTags(questionId, tags, 50), tags.size(), limit)
+                .stream()
+                .map(c -> new RelatedQuestionView(c.questionId(), c.title(), c.answerCount(), c.accepted(),
+                        RelatedQuestionPolicy.jaccard(c.sharedTags(), tags.size(), c.tagCount())))
+                .toList();
     }
 }

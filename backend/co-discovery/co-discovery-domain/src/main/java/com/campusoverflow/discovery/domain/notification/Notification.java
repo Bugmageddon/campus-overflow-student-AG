@@ -1,5 +1,6 @@
 package com.campusoverflow.discovery.domain.notification;
 
+import com.campusoverflow.shared.domain.BusinessRuleException;
 import com.campusoverflow.shared.domain.ForbiddenException;
 import java.time.Instant;
 import java.util.Objects;
@@ -30,8 +31,14 @@ public class Notification {
 
     public static Notification create(long recipientId, NotificationType type, String title, String link,
                                       String sourceEventId, Instant now) {
-        // TODO(S3)：实现 Notification.create——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Notification.create 尚未实现");
+        if (title == null || title.isBlank()) {
+            throw new BusinessRuleException("DIS-1004", "通知标题不能为空");
+        }
+        String trimmed = title.strip();
+        if (trimmed.codePointCount(0, trimmed.length()) > 200) {
+            trimmed = trimmed.substring(0, trimmed.offsetByCodePoints(0, 200));
+        }
+        return new Notification(null, recipientId, type, trimmed, link, sourceEventId, false, now);
     }
 
     public static Notification reconstitute(Long id, long recipientId, NotificationType type, String title,
@@ -40,8 +47,10 @@ public class Notification {
     }
 
     public void markRead(long actorId) {
-        // TODO(S3)：实现 Notification.markRead——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：Notification.markRead 尚未实现");
+        if (actorId != recipientId) {
+            throw new ForbiddenException("DIS-3001", "只能标记自己的通知");
+        }
+        this.read = true;
     }
 
     public void assignId(long id) {

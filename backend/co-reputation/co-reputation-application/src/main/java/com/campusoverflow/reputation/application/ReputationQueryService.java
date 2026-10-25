@@ -32,13 +32,29 @@ public class ReputationQueryService {
     }
 
     public ReputationProfileView profile(long userId, Actor viewerOrNull) {
-        // TODO(S3)：实现 ReputationQueryService.profile——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：ReputationQueryService.profile 尚未实现");
+        ReputationAccount account = accounts.findByUserId(userId)
+                .orElseThrow(() -> new NotFoundException("REP-4001", "声誉账户不存在"));
+        String displayName = identity.findUser(userId).map(UserSummary::displayName).orElse("某同学");
+        boolean self = viewerOrNull != null && viewerOrNull.userId() == userId;
+        Integer available = self ? account.availablePoints() : null;
+        Integer frozen = self ? account.frozenPoints() : null;
+        List<ReputationProfileView.BadgeView> badgeViews = badges.findByUser(userId).stream()
+                .map(a -> new ReputationProfileView.BadgeView(a.type().name(), a.type().displayName(),
+                        a.type().description(), a.awardedAt()))
+                .toList();
+        return new ReputationProfileView(userId, displayName, account.reputation(), available, frozen, badgeViews);
     }
 
     /** 声誉流水属于个人数据：仅本人与管理员可查看。 */
     public PageResult<LedgerEntryView> ledger(long userId, Actor viewer, PageRequest page) {
-        // TODO(S3)：实现 ReputationQueryService.ledger——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：ReputationQueryService.ledger 尚未实现");
+        if (viewer.userId() != userId && !viewer.isAdmin()) {
+            throw new ForbiddenException("REP-3002", "只能查看自己的声誉流水");
+        }
+        PageResult<com.campusoverflow.reputation.domain.LedgerEntry> result = ledger.findByUser(userId, page);
+        List<LedgerEntryView> items = result.items().stream()
+                .map(e -> new LedgerEntryView(e.id(), e.reason().name(), e.reason().label(), e.delta(),
+                        e.refType(), e.refId(), e.createdAt()))
+                .toList();
+        return new PageResult<>(items, result.total(), result.page(), result.size());
     }
 }

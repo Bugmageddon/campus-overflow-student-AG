@@ -3,6 +3,7 @@ package com.campusoverflow.discovery.domain.search;
 import com.campusoverflow.shared.domain.BusinessRuleException;
 import com.campusoverflow.shared.page.PageRequest;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -37,12 +38,20 @@ public record SearchQuery(String keyword, Long courseId, String tag, SearchSort 
     }
 
     public List<String> terms() {
-        // TODO(S3)：实现 SearchQuery.terms——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：SearchQuery.terms 尚未实现");
+        return keyword == null ? List.of() : terms(keyword);
     }
 
     private static List<String> terms(String keyword) {
-        // TODO(S3)：实现 SearchQuery.terms——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：SearchQuery.terms 尚未实现");
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (String raw : keyword.split("\\s+")) {
+            String term = raw.strip();
+            if (!term.isEmpty()) {
+                result.add(term);
+            }
+            if (result.size() >= MAX_TERMS) {
+                break;
+            }
+        }
+        return List.copyOf(result);
     }
 }

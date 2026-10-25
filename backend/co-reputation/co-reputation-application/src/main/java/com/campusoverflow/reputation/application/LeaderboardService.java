@@ -35,13 +35,37 @@ public class LeaderboardService {
     @EventListener
     @Transactional
     public void on(ReputationChangedEvent e) {
-        // TODO(S3)：实现 LeaderboardService.on——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：LeaderboardService.on 尚未实现");
+        if (!processed.markProcessed(e.eventId(), "reputation.leaderboard")) {
+            return;
+        }
+        store.increment(e.userId(), e.delta(), e.occurredAt());
     }
 
     @Transactional(readOnly = true)
     public List<LeaderboardEntryView> top(LeaderboardPeriod period, int limit) {
-        // TODO(S3)：实现 LeaderboardService.top——参考领域单元测试与 arc42 文档中的业务规则
-        throw new UnsupportedOperationException("TODO(S3)：LeaderboardService.top 尚未实现");
+        if (period == LeaderboardPeriod.ALL) {
+            List<com.campusoverflow.reputation.domain.ReputationAccount> all = accounts.topByReputation(limit);
+            List<Long> ids = all.stream().map(com.campusoverflow.reputation.domain.ReputationAccount::userId).toList();
+            Map<Long, UserSummary> users = identity.findUsers(ids);
+            List<LeaderboardEntryView> result = new ArrayList<>();
+            for (int i = 0; i < all.size(); i++) {
+                ReputationAccount a = all.get(i);
+                UserSummary u = users.get(a.userId());
+                result.add(new LeaderboardEntryView(i + 1, a.userId(), u == null ? "某同学" : u.displayName(),
+                        u != null && u.verified(), a.reputation()));
+            }
+            return result;
+        }
+        List<LeaderboardStore.Entry> entries = store.top(period, clock.instant(), limit);
+        List<Long> ids = entries.stream().map(LeaderboardStore.Entry::userId).toList();
+        Map<Long, UserSummary> users = identity.findUsers(ids);
+        List<LeaderboardEntryView> result = new ArrayList<>();
+        for (int i = 0; i < entries.size(); i++) {
+            LeaderboardStore.Entry entry = entries.get(i);
+            UserSummary u = users.get(entry.userId());
+            result.add(new LeaderboardEntryView(i + 1, entry.userId(), u == null ? "某同学" : u.displayName(),
+                    u != null && u.verified(), entry.score()));
+        }
+        return result;
     }
 }

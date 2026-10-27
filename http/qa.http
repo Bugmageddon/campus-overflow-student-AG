@@ -1,0 +1,176 @@
+### 0. 初始化：获取 CSRF，生成两个唯一账号
+GET http://127.0.0.1:8080/api/v1/auth/csrf
+
+> {%
+  var suffix = Date.now().toString().slice(-8);
+  client.global.set("suffix", suffix);
+  client.global.set("userA", "smokeA" + suffix);
+  client.global.set("userB", "smokeB" + suffix);
+  client.global.set("password", "SmokePass123");
+  var setCookie = response.headers.valueOf("Set-Cookie");
+  var match = setCookie ? setCookie.match(/XSRF-TOKEN=([^;]+)/) : null;
+  client.global.set("csrf", match ? match[1] : response.body.token);
+%}
+
+### 1. 注册 A（提问者）
+POST http://127.0.0.1:8080/api/v1/auth/register
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "username": "{{userA}}",
+  "displayName": "冒烟甲{{suffix}}",
+  "email": "{{userA}}@example.com",
+  "password": "{{password}}",
+  "college": "计算机学院",
+  "className": "软工2401"
+}
+
+### 2. 登录 A
+POST http://127.0.0.1:8080/api/v1/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "username": "{{userA}}",
+  "password": "{{password}}"
+}
+
+### 2.1 登录 A 后刷新 CSRF
+GET http://127.0.0.1:8080/api/v1/auth/csrf
+
+> {%
+  var setCookie = response.headers.valueOf("Set-Cookie");
+  var match = setCookie ? setCookie.match(/XSRF-TOKEN=([^;]+)/) : null;
+  client.global.set("csrf", match ? match[1] : response.body.token);
+%}
+
+### 3. A 提问
+POST http://127.0.0.1:8080/api/v1/questions
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "courseId": null,
+  "title": "冒烟测试：红黑树插入后如何判断旋转方向？",
+  "body": "插入节点后出现连续红色节点，什么时候左旋、什么时候右旋？请给出判断步骤。",
+  "tags": ["数据结构", "红黑树"]
+}
+
+> {%
+  client.global.set("questionId", response.body.id);
+%}
+
+### 4. A 退出
+POST http://127.0.0.1:8080/api/v1/auth/logout
+X-XSRF-TOKEN: {{csrf}}
+
+### 5. 重新获取 CSRF（A 退出后会话变了）
+GET http://127.0.0.1:8080/api/v1/auth/csrf
+
+> {%
+  var setCookie = response.headers.valueOf("Set-Cookie");
+  var match = setCookie ? setCookie.match(/XSRF-TOKEN=([^;]+)/) : null;
+  client.global.set("csrf", match ? match[1] : response.body.token);
+%}
+
+### 6. 注册 B（回答者）
+POST http://127.0.0.1:8080/api/v1/auth/register
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "username": "{{userB}}",
+  "displayName": "冒烟乙{{suffix}}",
+  "email": "{{userB}}@example.com",
+  "password": "{{password}}",
+  "college": "计算机学院",
+  "className": "软工2401"
+}
+
+### 7. 登录 B
+POST http://127.0.0.1:8080/api/v1/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "username": "{{userB}}",
+  "password": "{{password}}"
+}
+
+### 7.1 登录 B 后刷新 CSRF
+GET http://127.0.0.1:8080/api/v1/auth/csrf
+
+> {%
+  var setCookie = response.headers.valueOf("Set-Cookie");
+  var match = setCookie ? setCookie.match(/XSRF-TOKEN=([^;]+)/) : null;
+  client.global.set("csrf", match ? match[1] : response.body.token);
+%}
+
+### 8. B 回答
+POST http://127.0.0.1:8080/api/v1/questions/{{questionId}}/answers
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "body": "看叔叔节点颜色和插入位置：叔叔红则变色上移，叔叔黑则按 LL/LR/RR/RL 旋转。"
+}
+
+> {%
+  client.global.set("answerId", response.body.id);
+%}
+
+### 9. B 退出
+POST http://127.0.0.1:8080/api/v1/auth/logout
+X-XSRF-TOKEN: {{csrf}}
+
+### 10. 重新获取 CSRF
+GET http://127.0.0.1:8080/api/v1/auth/csrf
+
+> {%
+  var setCookie = response.headers.valueOf("Set-Cookie");
+  var match = setCookie ? setCookie.match(/XSRF-TOKEN=([^;]+)/) : null;
+  client.global.set("csrf", match ? match[1] : response.body.token);
+%}
+
+### 11. 重新登录 A
+POST http://127.0.0.1:8080/api/v1/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "username": "{{userA}}",
+  "password": "{{password}}"
+}
+
+### 11.1 重新登录 A 后刷新 CSRF
+GET http://127.0.0.1:8080/api/v1/auth/csrf
+
+> {%
+  var setCookie = response.headers.valueOf("Set-Cookie");
+  var match = setCookie ? setCookie.match(/XSRF-TOKEN=([^;]+)/) : null;
+  client.global.set("csrf", match ? match[1] : response.body.token);
+%}
+
+### 12. A 给 B 的回答投票
+PUT http://127.0.0.1:8080/api/v1/votes
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "targetType": "ANSWER",
+  "targetId": {{answerId}},
+  "value": 1
+}
+
+### 13. A 采纳 B 的回答
+PUT http://127.0.0.1:8080/api/v1/questions/{{questionId}}/accepted-answer
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrf}}
+
+{
+  "answerId": {{answerId}}
+}
+
+### 14. 查询详情，验证已采纳
+GET http://127.0.0.1:8080/api/v1/questions/{{questionId}}

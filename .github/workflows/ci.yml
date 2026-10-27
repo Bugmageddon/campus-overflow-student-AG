@@ -31,6 +31,9 @@ jobs:
       - name: 架构约束
         run: mvn -B -f backend/pom.xml test -pl co-bootstrap -am -Dtest=ArchitectureTest -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
 
+      - name: Q&A 领域覆盖率门禁
+        run: mvn -B -f backend/pom.xml verify -pl co-qa/co-qa-domain -am -DskipITs
+
       - name: 归档测试报告
         if: always()
         uses: actions/upload-artifact@v4
